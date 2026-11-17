@@ -66,7 +66,7 @@ public partial class Sws2Armory(ISwiftlyCore core) : BasePlugin(core)
         Register("nametag", OnNameTag);
         Register("armoryrefresh", OnRefresh);
         Register("armoryreset", OnReset);
-        Register("armorystatus", c => c.Reply($"sws2-armory {VersionInfo.Version}; enabled={_settings.Enabled}; catalog={_catalog.Entries.Count}; menus={_menus?.IsAvailable == true}; precachedAgents={_precached.Count}"));
+        Register("armorystatus", c => c.Reply($"sws2-armory {VersionInfo.Version}; enabled={_settings.Enabled}; catalog={_catalog.Entries.Count}; menus={_menus?.IsAvailable == true}; customHud={_menus?.IsCustomHudAvailable == true}; precachedAgents={_precached.Count}"));
         _hooks.Add(Core.GameEvent.HookPost<EventPlayerSpawn>(OnSpawn));
         _hooks.Add(Core.GameEvent.HookPost<EventItemPickup>(OnPickup));
         _hooks.Add(Core.GameEvent.HookPost<EventPlayerDeath>(OnDeath));

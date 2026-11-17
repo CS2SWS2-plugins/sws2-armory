@@ -1,6 +1,6 @@
 # sws2-armory
 
-基于 SwiftlyS2 的私人 CS2 服务器免费饰品插件，使用 `sws2-cs2menus` 提供统一菜单。按 SteamID64 保存个人选择，出生、拾取武器及换图后重新应用。饰品只在当前服务器显示，不向 Steam 库存添加物品。
+基于 SwiftlyS2 的私人 CS2 服务器免费饰品插件，使用 `sws2-cs2menus` 的新版 CS2 Custom HUD 提供统一菜单。按 SteamID64 保存个人选择，出生、拾取武器及换图后重新应用。饰品只在当前服务器显示，不向 Steam 库存添加物品。
 
 目前为首版开发测试包；已进行源码构建和离线回归检查，客户端显示、动画与声音需要实服测试。
 
@@ -23,10 +23,10 @@
 
 ## 安装
 
-1. 安装 SwiftlyS2 **1.5.3 或更新版本**，以及兼容的 [sws2-cs2menus](https://github.com/XBDJ504764827/sws2-cs2menus)。插件使用该仓库提交 `3c0ec3b6aca0016d82f365f32acddeba338ae439` 的共享合约构建。其他套件插件无需安装。
+1. 安装 SwiftlyS2 **1.5.3 或更新版本**，以及本次同步更新的 [sws2-cs2menus](https://github.com/XBDJ504764827/sws2-cs2menus)。插件使用该仓库提交 `3dcf7c1d76d688f46191ea33f1d4b7c1b9461207` 的共享合约构建。其他套件插件无需安装。
 2. 在 `csgo/addons/swiftlys2/configs/core.jsonc` 将 **`FollowCS2ServerGuidelines` 设为 `false`**，然后重启服务器。SwiftlyS2 的默认值 `true` 会阻止本插件写入饰品属性；本插件不自动修改宿主配置。
 3. 将测试包或 Release ZIP 完整解压到 `csgo/addons/swiftlys2/plugins/`，保留 `sws2-armory/` 目录。不要只复制 DLL，也不要丢弃目录、翻译或 `resources/exports/`。
-4. 先加载 menus，再加载 armory；首次安装建议完整重启或换图，使探员模型完成预缓存。
+4. 将 menus 与 armory 两个更新包一起安装并重启服务器，再先加载 menus、后加载 armory，使共享合约及探员模型一致。旧 menus 尚未提供 HUD 就绪接口，不能用于本版本。
 
 ```text
 sw plugins load sws2-cs2menus
@@ -49,7 +49,11 @@ csgo/addons/swiftlys2/
 └── data/sws2-armory/players/<SteamID64>.json
 ```
 
-`csgo/` 可能位于 `game/csgo/`。菜单沿用 menus 的 HUD 或中心 HTML 渲染，不需要 armory 专属 Workshop addon；自定义 HUD 的部署按 menus 文档操作。menus 不可用时，直接设置命令仍可使用。
+`csgo/` 可能位于 `game/csgo/`。军械库只使用 menus 的新版 `custom_hud_layout` / Panorama HUD，不回退到中心 HTML。无需 armory 专属 Workshop addon，直接复用 admin 使用的 menus HUD 框架。确保 menus 的 `Menu.Backend` 为 `auto` 或 `hudlayout`、配置真实的 `Menu.HudLayoutWorkshopId`，并由 MultiAddonManager 下载挂载已编译的 addon；也可使用已挂载的本地布局资源。菜单插件 DLL 不包含编译后的 HUD addon，详细部署按 menus 的 Workshop 文档操作。
+
+执行 `sw_hudstatus` 确认 `layoutReady=True`，再用 `sw_armorystatus` 确认 `customHud=True`。缺少 HUD 资源、强制 `classic` 或使用旧版 menus 时，打开菜单会提示尚未就绪；直接设置饰品命令仍可使用。旧菜单不会作为替代入口。
+
+主面板采用与 admin 相同的**左侧分类 / 右侧内容**框架，五个侧栏入口分别为武器、刀具、手套、探员与音乐盒、饰品设置。第一项自动打开；印花、挂件、自定义参数、重新应用和重置都在“饰品设置”中，选择饰品后当前页显示“已装备”。重置使用新版 HUD 的确认布局。
 
 ## 玩家命令
 
@@ -82,7 +86,7 @@ csgo/addons/swiftlys2/
 
 ## 配置与保存
 
-首次加载生成 `configs/plugins/sws2-armory/config.jsonc`，修改该文件时保留最外层节点：
+首次加载生成 `configs/plugins/sws2-armory/config.jsonc`，修改该文件时保留最外层节点（本插件不修改 menus 的渲染器配置）：
 
 ```json
 {

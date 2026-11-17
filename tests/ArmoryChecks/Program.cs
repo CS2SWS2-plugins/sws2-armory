@@ -34,6 +34,16 @@ Check(Enum.GetValues<CosmeticKind>().All(kind => !settings.Allows(kind)), "Globa
 settings = new ArmorySettings { Knives = false };
 Check(!settings.Allows(CosmeticKind.Knife) && settings.Allows(CosmeticKind.Weapon), "Independent category toggles");
 
+var sidebar = ArmoryHudNavigation.Sections(new ArmorySettings()).ToArray();
+Check(sidebar.Length == 5, "All-enabled HUD fits the five category slots");
+Check(sidebar.SelectMany(ArmoryHudNavigation.Kinds).ToHashSet().SetEquals(Enum.GetValues<CosmeticKind>()), "Every cosmetic category remains reachable in the sidebar");
+Check(!ArmoryHudNavigation.Sections(new ArmorySettings { Enabled = false }).Any(), "Disabled plugin exposes no HUD categories");
+Check(!ArmoryHudNavigation.Sections(new ArmorySettings { Agents = false, Music = false }).Contains(ArmoryHudSection.Player), "Empty player category is hidden");
+Check(ArmoryHudNavigation.Sections(new ArmorySettings { Agents = false }).Contains(ArmoryHudSection.Player), "Music remains reachable when agents are disabled");
+Check(ArmoryHudNavigation.Sections(new ArmorySettings { Music = false }).Contains(ArmoryHudSection.Player), "Agents remain reachable when music is disabled");
+var allModulesOff = new ArmorySettings { Weapons = false, Knives = false, Gloves = false, Agents = false, Music = false, Stickers = false, Charms = false };
+Check(ArmoryHudNavigation.Sections(allModulesOff).SequenceEqual(new[] { ArmoryHudSection.Tools }), "Refresh and reset remain reachable with all cosmetic modules disabled");
+
 var temporary = Path.Combine(Path.GetTempPath(), $"armory-checks-{Guid.NewGuid():N}");
 Directory.CreateDirectory(temporary);
 try

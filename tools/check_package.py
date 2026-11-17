@@ -45,6 +45,9 @@ def main():
             version = re.search(r'public const string Version = "([^"]+)";', (root / 'src/VersionInfo.cs').read_text()).group(1)
             dependencies = json.loads(package.read('sws2-armory/sws2-armory.deps.json'))
             assert f'sws2-armory/{version}' in dependencies['libraries'], 'Dependency metadata version must match plugin version'
+            contract = package.read('sws2-armory/Sws2Cs2Menus.Contracts.dll')
+            assert b'get_IsCustomHudAvailable' in contract, 'Package must contain the new HUD capability contract'
+            assert contract == package.read('sws2-armory/resources/exports/Sws2Cs2Menus.Contracts.dll'), 'Exported menu contract must match the runtime copy'
             assert all(n.startswith('sws2-armory/') for n in names)
             assert not any(n.endswith('SwiftlyS2.Shared.dll') or n.endswith('SwiftlyS2.Core.dll') for n in names)
             assert package.testzip() is None

@@ -8,7 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../src/Models/*.cs" Link="Models/%(Filename)%(Extension)" />
-    <Compile Include="../../src/Services/CosmeticCatalog.cs;../../src/Services/CustomizationInput.cs;../../src/Services/LoadoutStore.cs;../../src/Configuration/ArmorySettings.cs" />
+    <Compile Include="../../src/Services/ArmoryHudNavigation.cs;../../src/Services/CosmeticCatalog.cs;../../src/Services/CustomizationInput.cs;../../src/Services/LoadoutStore.cs;../../src/Configuration/ArmorySettings.cs" />
     <Content Include="../../resources/catalog/items.json" Link="items.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
