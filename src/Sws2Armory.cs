@@ -23,6 +23,8 @@ public partial class Sws2Armory(ISwiftlyCore core) : BasePlugin(core)
     private ServiceProvider? _provider;
     private IDisposable? _subscription;
     private IMenuService? _menus;
+    private Func<bool>? _customHudAvailable;
+    private bool CustomHudReady => _menus?.IsAvailable == true && _customHudAvailable?.Invoke() == true;
     private CancellationTokenSource? _reconcile;
     private readonly List<Guid> _commands = [];
     private readonly List<Guid> _hooks = [];
@@ -66,7 +68,7 @@ public partial class Sws2Armory(ISwiftlyCore core) : BasePlugin(core)
         Register("nametag", OnNameTag);
         Register("armoryrefresh", OnRefresh);
         Register("armoryreset", OnReset);
-        Register("armorystatus", c => c.Reply($"sws2-armory {VersionInfo.Version}; enabled={_settings.Enabled}; catalog={_catalog.Entries.Count}; menus={_menus?.IsAvailable == true}; customHud={_menus?.IsCustomHudAvailable == true}; precachedAgents={_precached.Count}"));
+        Register("armorystatus", c => c.Reply($"sws2-armory {VersionInfo.Version}; enabled={_settings.Enabled}; catalog={_catalog.Entries.Count}; menus={_menus?.IsAvailable == true}; customHud={CustomHudReady}; precachedAgents={_precached.Count}"));
         _hooks.Add(Core.GameEvent.HookPost<EventPlayerSpawn>(OnSpawn));
         _hooks.Add(Core.GameEvent.HookPost<EventItemPickup>(OnPickup));
         _hooks.Add(Core.GameEvent.HookPost<EventPlayerDeath>(OnDeath));
@@ -83,12 +85,15 @@ public partial class Sws2Armory(ISwiftlyCore core) : BasePlugin(core)
     {
         CloseOwnedMenus();
         _menus = interfaces.TryGetSharedInterface<IMenuService>(MenuServiceConstants.InterfaceKey, out var service) ? service : null;
+        _customHudAvailable = interfaces.TryGetSharedInterface<Func<bool>>(MenuServiceConstants.CustomHudInterfaceKey, out var ready) ? ready : null;
     }
 
     public override void Unload()
     {
         _loaded = false;
         CloseOwnedMenus();
+        _customHudAvailable = null;
+        _menus = null;
         _reconcile?.Cancel();
         _reconcile?.Dispose();
         _subscription?.Dispose();

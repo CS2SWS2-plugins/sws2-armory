@@ -9,7 +9,7 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <AssemblyName>sws2-armory</AssemblyName>
     <RootNamespace>Sws2Armory</RootNamespace>
-    <Version>1.0.0-dev.2</Version>
+    <Version>1.0.0-dev.4</Version>
     <OutputPath>$(MSBuildThisFileDirectory)build/</OutputPath>
     <PublishDir>$(OutputPath)publish/sws2-armory</PublishDir>
     <!-- The contract repositories are cloned into the workspace by CI; keep their

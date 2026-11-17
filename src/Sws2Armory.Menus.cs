@@ -16,7 +16,7 @@ public partial class Sws2Armory
     {
         if (!_loaded || !_settings.Enabled || !player.IsValid || Profile(player) is null) return null;
         if (_menus is not { IsAvailable: true }) { Reply(player, "error.menus"); return null; }
-        if (!_menus.IsCustomHudAvailable) { Reply(player, "error.hud"); return null; }
+        if (!CustomHudReady) { Reply(player, "error.hud"); return null; }
         return _menus.CreateMenu(Text(player, key)).Id($"armory.{player.SteamID}.{Guid.NewGuid():N}")
             .Layout(layout).Comment(Text(player, "menu.help")).PageSize(5).ShowBack().ShowClose().CloseOnSelect(false);
     }
@@ -25,7 +25,7 @@ public partial class Sws2Armory
     {
         // Recheck before opening: older providers and classic fallback are never
         // valid renderers for armory, including directly invoked subcommands.
-        if (_menus is not { IsAvailable: true, IsCustomHudAvailable: true }) { Reply(player, "error.hud"); return; }
+        if (_menus is not { IsAvailable: true } || !CustomHudReady) { Reply(player, "error.hud"); return; }
         var ownedRoot = _menus.GetNavigationStack(player).FirstOrDefault()?.Id.StartsWith("armory.", StringComparison.Ordinal) == true;
         var result = root || !ownedRoot ? _menus.Open(player, builder.Build())
             : replaceCurrent ? _menus.ReplaceCurrent(player, builder.Build()) : _menus.OpenSubMenu(player, builder.Build());

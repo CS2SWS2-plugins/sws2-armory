@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: XBDJ504764827/sws2-cs2menus
-          ref: 3dcf7c1d76d688f46191ea33f1d4b7c1b9461207
+          ref: cc2bb121e6753508f48376be0b4e1a91ab0f9ce5
           path: sws2-cs2menus
       - uses: actions/setup-dotnet@v4
         with:
@@ -40,8 +40,8 @@ jobs:
         run: dotnet build sws2-armory.csproj -c Release --no-restore -warnaserror
       - name: Loadout, catalog and input regression checks
         run: dotnet run --project tests/ArmoryChecks/ArmoryChecks.csproj -c Release
-      - name: Shared HUD capability regression checks
-        run: dotnet run --project sws2-cs2menus/tests/HudChecks/HudChecks.csproj -c Release
+      - name: Shared HUD binary compatibility regression checks
+        run: python3 sws2-cs2menus/tools/check_hud_compatibility.py --plugin build/net10.0/sws2-armory.dll
       - name: Catalog provenance, translations and version checks
         run: python3 tools/check_package.py
 
@@ -58,7 +58,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: XBDJ504764827/sws2-cs2menus
-          ref: 3dcf7c1d76d688f46191ea33f1d4b7c1b9461207
+          ref: cc2bb121e6753508f48376be0b4e1a91ab0f9ce5
           path: sws2-cs2menus
       - uses: actions/setup-dotnet@v4
         with:

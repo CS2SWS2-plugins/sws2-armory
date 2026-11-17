@@ -23,10 +23,10 @@
 
 ## 安装
 
-1. 安装 SwiftlyS2 **1.5.3 或更新版本**，以及本次同步更新的 [sws2-cs2menus](https://github.com/XBDJ504764827/sws2-cs2menus)。插件使用该仓库提交 `3dcf7c1d76d688f46191ea33f1d4b7c1b9461207` 的共享合约构建。其他套件插件无需安装。
+1. 安装 SwiftlyS2 **1.5.3 或更新版本**，以及本次同步更新的 [sws2-cs2menus](https://github.com/XBDJ504764827/sws2-cs2menus)。插件使用该仓库提交 `cc2bb121e6753508f48376be0b4e1a91ab0f9ce5` 的共享合约构建。其他套件插件无需安装。
 2. 在 `csgo/addons/swiftlys2/configs/core.jsonc` 将 **`FollowCS2ServerGuidelines` 设为 `false`**，然后重启服务器。SwiftlyS2 的默认值 `true` 会阻止本插件写入饰品属性；本插件不自动修改宿主配置。
 3. 将测试包或 Release ZIP 完整解压到 `csgo/addons/swiftlys2/plugins/`，保留 `sws2-armory/` 目录。不要只复制 DLL，也不要丢弃目录、翻译或 `resources/exports/`。
-4. 将 menus 与 armory 两个更新包一起安装并重启服务器，再先加载 menus、后加载 armory，使共享合约及探员模型一致。旧 menus 尚未提供 HUD 就绪接口，不能用于本版本。
+4. 将 menus 与 armory 两个更新包一起安装并重启服务器，再先加载 menus、后加载 armory，使共享合约及探员模型一致。旧 menus 尚未提供新版 HUD 就绪回调，不能用于本版本。此前的 `IsCustomHudAvailable` 默认接口成员已改为独立的 `sws2-cs2menus.custom-hud.v1` 共享回调，兼容其他插件目录中的旧版基础菜单合约。升级时需要完整重启 CS2 进程，热重载不会清除已加载的共享 DLL；其他套件插件无需为本次 HUD 查询改动重新构建。
 
 ```text
 sw plugins load sws2-cs2menus
@@ -114,7 +114,7 @@ csgo/addons/swiftlys2/
 
 - 默认分支 `main`，功能开发与提交在 `develop`。实服测试后由维护者手动创建/合并 PR；不自动合并。
 - 每次推送 `develop`、以及发往 `main` / `develop` 的 PR，都运行 **Code checks** 和 **Test package**。
-- 代码检查包含格式/analyzer 检查、将编译警告视为错误、饰品目录/输入/存档回归检查、翻译及目录来源校验。
+- 代码检查包含格式/analyzer 检查、将编译警告视为错误、饰品目录/输入/存档回归检查、翻译及目录来源校验，以及预加载旧菜单合约后的 HUD 状态测试和实际插件方法 JIT 检查。
 - 每次成功构建在 Actions Artifacts 生成 `sws2-armory-v1.0.0-dev.<run>.zip`；PR 使用 `-pr.<PR号>.<run>`。进入该运行记录下载 artifact，再取内部安装 ZIP。保留 30 天。
 - PR 合并至 `main` 后自动构建正式包、创建版本标签及 GitHub Release。首次 `1.0.0`，以后按稳定标签自动增加 patch；手动 Release workflow 可选择 minor/major。
 - 自动版本写入构建用 `VersionInfo.cs`、程序集及 ZIP 名称，不额外向分支写入版本提交。预览标签不参与稳定版递增。

@@ -1,6 +1,6 @@
 # 首版实服验收
 
-环境：SwiftlyS2 >= 1.5.3、本次同步更新的 sws2-cs2menus（包含 IsCustomHudAvailable 接口），已挂载其编译后的 Panorama addon，core.jsonc 的 FollowCS2ServerGuidelines=false。安装后重启/换图，使探员资源预缓存。记录 CS2 构建号、SwiftlyS2 版本、armory 版本与服务端错误日志。
+环境：SwiftlyS2 >= 1.5.3、本次同步更新的 sws2-cs2menus（提供 sws2-cs2menus.custom-hud.v1 共享就绪回调），已挂载其编译后的 Panorama addon，core.jsonc 的 FollowCS2ServerGuidelines=false。安装后重启/换图，使探员资源预缓存。记录 CS2 构建号、SwiftlyS2 版本、armory 版本与服务端错误日志。
 
 1. 一名玩家进入 T、一名进入 CT。使用 `!armory` 检查新版 HUD 的五个侧栏入口、右侧页面及第一项自动打开；翻页、进入分类、返回/关闭；搜索中英文。印花大分类的范围菜单应能到达所有条目，且不阻塞游戏。
 2. AK-47、AWP、M4A1-S 和 USP-S 各选择皮肤，观察第一/第三人称和检视；测试旧模型皮肤和新模型皮肤，确认持枪、弹药、开火、装填没有异常。选择不应给予额外武器或弹药。
@@ -19,3 +19,5 @@
 本仓库未连接真实 CS2 服务器。以上为待维护者执行的验收步骤，不是已通过的测试记录。
 
 新版 HUD 专项：检查印花、挂件、探员、音乐盒、Float、Seed、StatTrak 与重置都能从五个侧栏入口到达；选择饰品后“已装备”标记更新，导航栈不增长、返回保留父页。打开 admin 后直接输入 !armoryreset，军械库不能嵌入 admin 的导航栈。
+
+共享合约兼容专项：保留服务器上 admin、mapmanager、rockthevote 的原有版本，完整更新 menus 与 armory 后重启整个 CS2 进程。确认不再出现 `IMenuService.get_IsCustomHudAvailable()` 的 MissingMethodException；挂载 addon 后菜单正常、HUD 状态可查询。重载 menus 后再次验证 armory 重新取得回调；将 menus 设置为 classic 后 armory 拒绝开菜单。离线 CI 已用旧版合约预加载覆盖二进制兼容性，真实服务器的加载顺序仍需执行本项验收。
