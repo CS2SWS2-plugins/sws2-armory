@@ -1,0 +1,24 @@
+{
+  "source": "https://github.com/Ayrton09/AstraSkins",
+  "commit": "ed77e55e3f990d0368ba3b30058642cad34550aa",
+  "license": "MIT",
+  "counts": {
+    "Weapon": 1449,
+    "Knife": 576,
+    "Glove": 94,
+    "Agent": 63,
+    "Music": 100,
+    "Sticker": 11134,
+    "Charm": 78
+  },
+  "inputSha256": {
+    "weapons.json": "cc00f83d32bdffb1eabb5b6acced57e586001189a4b20788f417da806559276d",
+    "knives.json": "359ea4822ee461ee0583bc2dc3236d4f0ad22ee104df7ad9457aa7f653b66ef9",
+    "gloves.json": "4da8ed833486dc77f159315b025b23b51109476740078eed8d24fe96bb68c928",
+    "agents.json": "b2f88e2ca1c9c789b693cb85195358d42a634e09adb61f2c6e8ac4508fa414cb",
+    "music_kits.json": "c65718c3867e0333e401426388567b29a76781b43a2157e95b672ef746e6aea7",
+    "stickers.json": "33383203742c38ca5ae9f394ec7d4ac7ee67296d96f02783d501d4be8c126eb5",
+    "keychains.json": "57bdd03b91061e50ecc00e12be0b8d1f5d179645b7a264fe8ecff6a787bd660d"
+  },
+  "catalogSha256": "1519200145510f00b31116d5932998bbd3d04ab3bfdc3f99a992be3d068e8baa"
+}

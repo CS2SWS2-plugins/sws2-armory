@@ -8,5 +8,9 @@ obj/
 .idea/
 *.zip
 *.dll
+__pycache__/
+*.pyc
+core
+core.*
 .DS_Store
 Thumbs.db

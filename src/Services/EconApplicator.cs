@@ -1,0 +1,89 @@
+using SwiftlyS2.Shared.SchemaDefinitions;
+using Sws2Armory.Models;
+
+namespace Sws2Armory.Services;
+
+// All calls must run on the game thread. Integer econ attributes store their
+// bits in a float union; numeric conversion would corrupt sticker IDs/counters.
+public sealed class EconApplicator(CosmeticCatalog catalog)
+{
+    private ulong _nextItemId = 0xF000000000000000;
+
+    public static void UpdateCounter(CBasePlayerWeapon weapon, int count)
+    {
+        var item = weapon.AttributeManager.Item;
+        item.AttributeList.SetOrAddAttribute("kill eater", BitConverter.Int32BitsToSingle(count));
+        item.NetworkedDynamicAttributes.SetOrAddAttribute("kill eater", BitConverter.Int32BitsToSingle(count));
+        item.AttributeListUpdated();
+        item.NetworkedDynamicAttributesUpdated();
+        weapon.FallbackStatTrak = count;
+        weapon.FallbackStatTrakUpdated();
+    }
+
+    public void Paint(CEconItemView item, ulong steamId, CatalogEntry? cosmetic,
+        ItemSelection selection, bool knife, bool stickersEnabled, bool charmsEnabled)
+    {
+        if (cosmetic is not null) item.ItemDefinitionIndex = cosmetic.DefinitionIndex;
+        item.EntityQuality = selection.StatTrak.HasValue ? 9 : knife ? 3 : 0;
+        var id = _nextItemId++;
+        item.ItemID = id;
+        item.ItemIDLow = (uint)id;
+        item.ItemIDHigh = (uint)(id >> 32);
+        item.AccountID = (uint)steamId;
+        item.Initialized = true;
+        item.CustomName = selection.NameTag;
+        item.CustomNameOverride = selection.NameTag;
+        foreach (var list in new[] { item.AttributeList, item.NetworkedDynamicAttributes })
+        {
+            list.Attributes.RemoveAll();
+            list.SetOrAddAttribute("set item texture prefab", cosmetic?.Kit ?? 0);
+            list.SetOrAddAttribute("set item texture seed", selection.Seed ?? cosmetic?.Seed ?? 0);
+            list.SetOrAddAttribute("set item texture wear", selection.Wear ?? cosmetic?.Wear ?? 0.0001f);
+            if (selection.StatTrak is { } count)
+            {
+                list.SetOrAddAttribute("kill eater", BitConverter.Int32BitsToSingle(count));
+                list.SetOrAddAttribute("kill eater score type", BitConverter.Int32BitsToSingle(0));
+            }
+            if (!knife && stickersEnabled)
+                foreach (var (slot, stickerId) in selection.Stickers)
+                    if (slot is >= 0 and <= 4 && catalog.Find(stickerId) is { Kind: CosmeticKind.Sticker } sticker)
+                        list.SetOrAddAttribute($"sticker slot {slot} id", BitConverter.Int32BitsToSingle(sticker.Kit));
+            if (!knife && charmsEnabled && catalog.Find(selection.Charm) is { Kind: CosmeticKind.Charm } charm)
+            {
+                list.SetOrAddAttribute("keychain slot 0 id", BitConverter.Int32BitsToSingle(charm.Kit));
+                list.SetOrAddAttribute("keychain slot 0 seed", BitConverter.Int32BitsToSingle(selection.CharmSeed));
+            }
+        }
+        item.ItemDefinitionIndexUpdated();
+        item.EntityQualityUpdated();
+        item.ItemIDHighUpdated();
+        item.ItemIDLowUpdated();
+        item.AccountIDUpdated();
+        item.InitializedUpdated();
+        item.AttributeListUpdated();
+        item.NetworkedDynamicAttributesUpdated();
+        item.CustomNameUpdated();
+    }
+
+    public void Weapon(CBasePlayerWeapon weapon, ulong steamId, CatalogEntry? cosmetic,
+        ItemSelection selection, bool knife, bool stickersEnabled, bool charmsEnabled)
+    {
+        if (knife && cosmetic is not null && weapon.AttributeManager.Item.ItemDefinitionIndex != cosmetic.DefinitionIndex)
+            weapon.AcceptInput("ChangeSubclass", cosmetic.DefinitionIndex.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Paint(weapon.AttributeManager.Item, steamId, cosmetic, selection, knife, stickersEnabled, charmsEnabled);
+        weapon.FallbackPaintKit = cosmetic?.Kit ?? 0;
+        weapon.FallbackSeed = selection.Seed ?? cosmetic?.Seed ?? 0;
+        weapon.FallbackWear = selection.Wear ?? cosmetic?.Wear ?? 0.0001f;
+        weapon.FallbackStatTrak = selection.StatTrak ?? -1;
+        weapon.OriginalOwnerXuidLow = (uint)steamId;
+        weapon.OriginalOwnerXuidHigh = (uint)(steamId >> 32);
+        weapon.FallbackPaintKitUpdated();
+        weapon.FallbackSeedUpdated();
+        weapon.FallbackWearUpdated();
+        weapon.FallbackStatTrakUpdated();
+        weapon.OriginalOwnerXuidLowUpdated();
+        weapon.OriginalOwnerXuidHighUpdated();
+        weapon.SetBodygroupByName("body", cosmetic?.LegacyModel == true ? 1 : 0);
+        weapon.SetBodygroupByName("stattrak", selection.StatTrak.HasValue ? 1 : 0);
+    }
+}
