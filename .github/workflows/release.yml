@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump
+        type: choice
+        default: patch
+        options: [patch, minor, major]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Verify and build stable package
+    if: (github.event_name == 'workflow_dispatch' && github.ref_name == 'main') || (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip release]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Checkout compatible menu contracts
+        uses: actions/checkout@v4
+        with:
+          repository: XBDJ504764827/sws2-cs2menus
+          ref: cc2bb121e6753508f48376be0b4e1a91ab0f9ce5
+          path: sws2-cs2menus
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+      - name: Compute and inject stable version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump || 'patch' }}
+        run: python3 tools/build_version.py --channel stable --bump "$BUMP"
+      - run: dotnet restore sws2-armory.csproj
+      - name: Verify formatting and analyzers
+        run: dotnet format sws2-armory.csproj --verify-no-changes --no-restore --severity warn
+      - name: Compile stable package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: dotnet build sws2-armory.csproj -c Release --no-restore -warnaserror -p:Version="$VERSION"
+      - name: Regression checks
+        run: dotnet run --project tests/ArmoryChecks/ArmoryChecks.csproj -c Release
+      - name: Shared HUD binary compatibility regression checks
+        run: python3 sws2-cs2menus/tools/check_hud_compatibility.py --plugin build/net10.0/sws2-armory.dll
+      - run: dotnet publish sws2-armory.csproj -c Release --no-build --no-restore
+      - name: Validate and name release package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python3 tools/check_package.py build/sws2-armory.zip
+          mv build/sws2-armory.zip "build/sws2-armory-v${VERSION}.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sws2-armory-v${{ steps.version.outputs.version }}
+          path: build/sws2-armory-v${{ steps.version.outputs.version }}.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: sws2-armory-v${{ needs.build.outputs.version }}
+          path: release
+      - name: Create version tag and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          gh release create "v${VERSION}" release/*.zip \
+            --target "$RELEASE_SHA" --title "sws2-armory v${VERSION}" --generate-notes

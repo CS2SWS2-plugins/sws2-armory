@@ -1,0 +1,13 @@
+{
+  "sws2-armory": {
+    "Enabled": true,
+    "Weapons": true,
+    "Knives": true,
+    "Gloves": true,
+    "Agents": true,
+    "Music": true,
+    "Stickers": true,
+    "Charms": true,
+    "CommandCooldownSeconds": 1.0
+  }
+}
