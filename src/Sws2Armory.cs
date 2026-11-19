@@ -50,8 +50,16 @@ public partial class Sws2Armory(ISwiftlyCore core) : BasePlugin(core)
         _subscription = options.OnChange(settings => Core.Scheduler.NextTick(() =>
         {
             if (!_loaded) return;
+            var refreshWeapons = settings.Allows(CosmeticKind.Weapon) != _settings.Allows(CosmeticKind.Weapon)
+                || settings.Allows(CosmeticKind.Knife) != _settings.Allows(CosmeticKind.Knife)
+                || settings.Allows(CosmeticKind.Sticker) != _settings.Allows(CosmeticKind.Sticker)
+                || settings.Allows(CosmeticKind.Charm) != _settings.Allows(CosmeticKind.Charm);
             _settings = settings;
-            foreach (var player in Core.PlayerManager.GetAllValidPlayers()) Invalidate(player.SteamID);
+            foreach (var player in Core.PlayerManager.GetAllValidPlayers())
+            {
+                Invalidate(player.SteamID);
+                if (refreshWeapons) ReconcilePlayer(player, refreshWeapons: true);
+            }
             CloseOwnedMenus();
         }));
         Register("armory", OnArmory);
@@ -144,12 +152,19 @@ public partial class Sws2Armory(ISwiftlyCore core) : BasePlugin(core)
         return true;
     }
 
-    private void Changed(IPlayer player, bool refreshView = true)
+    private void Changed(IPlayer player, string? target = null, bool refreshWeapons = false)
     {
         _store.Save(player.SteamID);
         Invalidate(player.SteamID);
-        ReconcilePlayer(player);
-        if (refreshView) RefreshView(player);
+        ReconcilePlayer(player, refreshWeapons || target is not (null or "glove"), target);
+    }
+
+    private void Refresh(IPlayer player)
+    {
+        _runtimeFailures.Remove(player.SteamID);
+        Invalidate(player.SteamID);
+        ReconcilePlayer(player, refreshWeapons: true);
+        Reply(player, "refreshed");
     }
 
     private void Invalidate(ulong steamId) => _revisions[steamId] = _revisions.GetValueOrDefault(steamId) + 1;

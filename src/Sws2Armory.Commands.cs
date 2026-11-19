@@ -43,11 +43,12 @@ public partial class Sws2Armory
         return CosmeticCatalog.IsKnife(definition) ? "knife" : _catalog.WeaponTarget(definition);
     }
 
-    private bool TryCustomization(ICommandContext context, out IPlayer player, out ItemSelection selection)
+    private bool TryCustomization(ICommandContext context, out IPlayer player, out ItemSelection selection, out string? target)
     {
         selection = null!;
+        target = null;
         if (!TryPlayer(context, out player, cooldown: true)) return false;
-        var target = context.Args.Length > 1 && context.Args[^1] is "knife" or "glove" ? context.Args[^1] : HeldTarget(player);
+        target = context.Args.Length > 1 && context.Args[^1] is "knife" or "glove" ? context.Args[^1] : HeldTarget(player);
         if (target is null || !_settings.Allows(target switch
         {
             "knife" => CosmeticKind.Knife,
@@ -65,43 +66,43 @@ public partial class Sws2Armory
 
     private void OnWear(ICommandContext context)
     {
-        if (!TryCustomization(context, out var player, out var item)) return;
+        if (!TryCustomization(context, out var player, out var item, out var target)) return;
         if (context.Args.Length < 1 || !CustomizationInput.TryWear(context.Args[0], out var value)) { Reply(player, "usage.wear"); return; }
         item.Wear = value;
-        Changed(player);
+        Changed(player, target);
         Reply(player, "saved");
     }
 
     private void OnSeed(ICommandContext context)
     {
-        if (!TryCustomization(context, out var player, out var item)) return;
+        if (!TryCustomization(context, out var player, out var item, out var target)) return;
         if (context.Args.Length < 1 || !CustomizationInput.TrySeed(context.Args[0], out var value)) { Reply(player, "usage.seed"); return; }
         item.Seed = value;
-        Changed(player);
+        Changed(player, target);
         Reply(player, "saved");
     }
 
     private void OnStatTrak(ICommandContext context)
     {
-        if (!TryCustomization(context, out var player, out var item)) return;
+        if (!TryCustomization(context, out var player, out var item, out var target)) return;
         if (context.Args.LastOrDefault() == "glove") { Reply(player, "usage.stattrak"); return; }
         var token = context.Args.FirstOrDefault() ?? (item.StatTrak is null ? "on" : "off");
         if (token == "off") item.StatTrak = null;
         else if (token == "on") item.StatTrak ??= 0;
         else if (CustomizationInput.TryCounter(token, out var count)) item.StatTrak = count;
         else { Reply(player, "usage.stattrak"); return; }
-        Changed(player);
+        Changed(player, target);
         Reply(player, "saved");
     }
 
     private void OnNameTag(ICommandContext context)
     {
-        if (!TryCustomization(context, out var player, out var item)) return;
+        if (!TryCustomization(context, out var player, out var item, out var target)) return;
         var text = string.Join(' ', context.Args).Trim();
         if (text == "clear") text = "";
         if (!CustomizationInput.ValidName(text)) { Reply(player, "usage.nametag"); return; }
         item.NameTag = text;
-        Changed(player);
+        Changed(player, target);
         Reply(player, "saved");
     }
 
@@ -127,11 +128,7 @@ public partial class Sws2Armory
     private void OnRefresh(ICommandContext context)
     {
         if (!TryPlayer(context, out var player, cooldown: true)) return;
-        _runtimeFailures.Remove(player.SteamID);
-        Invalidate(player.SteamID);
-        ReconcilePlayer(player);
-        RefreshView(player);
-        Reply(player, "refreshed");
+        Refresh(player);
     }
 
     private void OnReset(ICommandContext context)
@@ -150,7 +147,7 @@ public partial class Sws2Armory
         if (!CanMutate(player)) return;
         if (_menus?.GetNavigationStack(player).Any(menu => menu.Id.StartsWith("armory.", StringComparison.Ordinal)) == true) _menus.Close(player);
         _store.Reset(player.SteamID);
-        Changed(player);
+        Changed(player, refreshWeapons: true);
         Reply(player, "reset");
     }
 
@@ -191,7 +188,12 @@ public partial class Sws2Armory
                 GetItem(profile, entry.Target).CosmeticId = entry.Id;
                 break;
         }
-        Changed(player);
+        Changed(player, entry.Kind switch
+        {
+            CosmeticKind.Weapon or CosmeticKind.Knife => entry.Target,
+            CosmeticKind.Sticker or CosmeticKind.Charm => attachmentTarget,
+            _ => null
+        });
         Reply(player, "selected", entry.DisplayName(IsChinese(player)));
     }
 
@@ -207,7 +209,7 @@ public partial class Sws2Armory
         var item = GetItem(Profile(player)!, target);
         if (kind == CosmeticKind.Sticker) item.Stickers.Remove(slot);
         else item.Charm = null;
-        Changed(player);
+        Changed(player, target);
         Reply(player, "saved");
     }
 }

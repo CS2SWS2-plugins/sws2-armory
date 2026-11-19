@@ -1,3 +1,4 @@
+using System.Globalization;
 using SwiftlyS2.Shared.SchemaDefinitions;
 using Sws2Armory.Models;
 
@@ -7,13 +8,16 @@ namespace Sws2Armory.Services;
 // bits in a float union; numeric conversion would corrupt sticker IDs/counters.
 public sealed class EconApplicator(CosmeticCatalog catalog)
 {
-    private ulong _nextItemId = 0xF000000000000000;
+    private ulong _nextWeaponItemId = 1UL << 20;
+    private ulong _nextGloveItemId = 0xF000000000000000;
 
     public static void UpdateCounter(CBasePlayerWeapon weapon, int count)
     {
         var item = weapon.AttributeManager.Item;
         item.AttributeList.SetOrAddAttribute("kill eater", BitConverter.Int32BitsToSingle(count));
         item.NetworkedDynamicAttributes.SetOrAddAttribute("kill eater", BitConverter.Int32BitsToSingle(count));
+        item.AttributeList.AttributesUpdated();
+        item.NetworkedDynamicAttributes.AttributesUpdated();
         item.AttributeListUpdated();
         item.NetworkedDynamicAttributesUpdated();
         weapon.FallbackStatTrak = count;
@@ -25,7 +29,9 @@ public sealed class EconApplicator(CosmeticCatalog catalog)
     {
         if (cosmetic is not null) item.ItemDefinitionIndex = cosmetic.DefinitionIndex;
         item.EntityQuality = selection.StatTrak.HasValue ? 9 : knife ? 3 : 0;
-        var id = _nextItemId++;
+        // Use an ordinary econ ID for weapons so the client reads the dynamic attributes.
+        var glove = cosmetic?.Kind == CosmeticKind.Glove;
+        var id = glove ? _nextGloveItemId++ : _nextWeaponItemId++;
         item.ItemID = id;
         item.ItemIDLow = (uint)id;
         item.ItemIDHigh = (uint)(id >> 32);
@@ -51,8 +57,10 @@ public sealed class EconApplicator(CosmeticCatalog catalog)
             if (!knife && charmsEnabled && catalog.Find(selection.Charm) is { Kind: CosmeticKind.Charm } charm)
             {
                 list.SetOrAddAttribute("keychain slot 0 id", BitConverter.Int32BitsToSingle(charm.Kit));
-                list.SetOrAddAttribute("keychain slot 0 seed", BitConverter.Int32BitsToSingle(selection.CharmSeed));
+                if (selection.CharmSeed != 0)
+                    list.SetOrAddAttribute("keychain slot 0 seed", BitConverter.Int32BitsToSingle(selection.CharmSeed));
             }
+            if (!glove) list.AttributesUpdated();
         }
         item.ItemDefinitionIndexUpdated();
         item.EntityQualityUpdated();
@@ -66,11 +74,14 @@ public sealed class EconApplicator(CosmeticCatalog catalog)
     }
 
     public void Weapon(CBasePlayerWeapon weapon, ulong steamId, CatalogEntry? cosmetic,
-        ItemSelection selection, bool knife, bool stickersEnabled, bool charmsEnabled)
+        ItemSelection selection, ushort? knifeDefinition, bool stickersEnabled, bool charmsEnabled)
     {
-        if (knife && cosmetic is not null && weapon.AttributeManager.Item.ItemDefinitionIndex != cosmetic.DefinitionIndex)
-            weapon.AcceptInput("ChangeSubclass", cosmetic.DefinitionIndex.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        Paint(weapon.AttributeManager.Item, steamId, cosmetic, selection, knife, stickersEnabled, charmsEnabled);
+        if (knifeDefinition is { } definition)
+        {
+            if (weapon.AttributeManager.Item.ItemDefinitionIndex != definition)
+                weapon.AcceptInput("ChangeSubclass", definition.ToString(CultureInfo.InvariantCulture));
+            weapon.AttributeManager.Item.ItemDefinitionIndex = definition;
+        }
         weapon.FallbackPaintKit = cosmetic?.Kit ?? 0;
         weapon.FallbackSeed = selection.Seed ?? cosmetic?.Seed ?? 0;
         weapon.FallbackWear = selection.Wear ?? cosmetic?.Wear ?? 0.0001f;
@@ -83,6 +94,9 @@ public sealed class EconApplicator(CosmeticCatalog catalog)
         weapon.FallbackStatTrakUpdated();
         weapon.OriginalOwnerXuidLowUpdated();
         weapon.OriginalOwnerXuidHighUpdated();
+        Paint(weapon.AttributeManager.Item, steamId, cosmetic, selection, knifeDefinition.HasValue, stickersEnabled, charmsEnabled);
+        weapon.AttributeManager.ItemUpdated();
+        weapon.AttributeManagerUpdated();
         weapon.SetBodygroupByName("body", cosmetic?.LegacyModel == true ? 1 : 0);
         weapon.SetBodygroupByName("stattrak", selection.StatTrak.HasValue ? 1 : 0);
     }

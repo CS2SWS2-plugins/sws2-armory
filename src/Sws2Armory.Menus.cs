@@ -97,14 +97,7 @@ public partial class Sws2Armory
                 });
         menu.AddOption("refresh", Text(player, "menu.refresh"), c =>
         {
-            if (CanMutate(c.Player))
-            {
-                _runtimeFailures.Remove(c.Player.SteamID);
-                Invalidate(c.Player.SteamID);
-                ReconcilePlayer(c.Player);
-                RefreshView(c.Player);
-                Reply(c.Player, "refreshed");
-            }
+            if (CanMutate(c.Player)) Refresh(c.Player);
             return ValueTask.CompletedTask;
         });
         menu.AddOption(option => option.Id("reset").Text(Text(player, "menu.reset"))
@@ -240,14 +233,14 @@ public partial class Sws2Armory
             menu.AddOption($"wear-{wear}", $"Float {wear.ToString(CultureInfo.InvariantCulture)}", c =>
             {
                 if (CanMutate(c.Player) && Profile(c.Player)!.Items.TryGetValue(target, out var current))
-                { current.Wear = wear; Changed(c.Player); Reply(c.Player, "saved"); }
+                { current.Wear = wear; Changed(c.Player, target); Reply(c.Player, "saved"); }
                 return ValueTask.CompletedTask;
             });
         menu.AddOption("seed", Text(player, "menu.seed"), c => { OpenSeeds(c.Player, target); return ValueTask.CompletedTask; });
         menu.AddOption("stattrak", $"StatTrak: {(item.StatTrak is { } count ? count.ToString(CultureInfo.InvariantCulture) : "OFF")}", c =>
         {
             if (CanMutate(c.Player) && Profile(c.Player)!.Items.TryGetValue(target, out var current))
-            { current.StatTrak = current.StatTrak.HasValue ? null : 0; Changed(c.Player); Reply(c.Player, "saved"); }
+            { current.StatTrak = current.StatTrak.HasValue ? null : 0; Changed(c.Player, target); Reply(c.Player, "saved"); }
             return ValueTask.CompletedTask;
         });
         Show(player, menu);
@@ -262,7 +255,7 @@ public partial class Sws2Armory
             menu.AddOption($"seed-{seed}", seed.ToString(CultureInfo.InvariantCulture), c =>
             {
                 if (CanMutate(c.Player) && Profile(c.Player)!.Items.TryGetValue(target, out var current))
-                { current.Seed = seed; Changed(c.Player); Reply(c.Player, "saved"); }
+                { current.Seed = seed; Changed(c.Player, target); Reply(c.Player, "saved"); }
                 return ValueTask.CompletedTask;
             });
         Show(player, menu);
