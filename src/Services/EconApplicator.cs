@@ -1,4 +1,5 @@
 using System.Globalization;
+using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.SchemaDefinitions;
 using Sws2Armory.Models;
 
@@ -78,8 +79,11 @@ public sealed class EconApplicator(CosmeticCatalog catalog)
     {
         if (knifeDefinition is { } definition)
         {
-            if (weapon.AttributeManager.Item.ItemDefinitionIndex != definition)
-                weapon.AcceptInput("ChangeSubclass", definition.ToString(CultureInfo.InvariantCulture));
+            // The econ definition can already match while the entity still uses the stock subclass.
+            var subclass = definition.ToString(CultureInfo.InvariantCulture);
+            if (weapon.AttributeManager.Item.ItemDefinitionIndex != definition
+                || cosmetic is not null && weapon.SubclassID.HashCode != MurmurHash2.HashString(subclass))
+                weapon.AcceptInput("ChangeSubclass", subclass);
             weapon.AttributeManager.Item.ItemDefinitionIndex = definition;
         }
         weapon.FallbackPaintKit = cosmetic?.Kit ?? 0;
@@ -97,7 +101,10 @@ public sealed class EconApplicator(CosmeticCatalog catalog)
         Paint(weapon.AttributeManager.Item, steamId, cosmetic, selection, knifeDefinition.HasValue, stickersEnabled, charmsEnabled);
         weapon.AttributeManager.ItemUpdated();
         weapon.AttributeManagerUpdated();
-        weapon.SetBodygroupByName("body", cosmetic?.LegacyModel == true ? 1 : 0);
+        if (!knifeDefinition.HasValue)
+            weapon.SetBodygroupByName("body", cosmetic?.LegacyModel == true ? 1 : 0);
+        else if (cosmetic is { Kit: > 0 })
+            weapon.SetMeshGroupMask(ulong.MaxValue);
         weapon.SetBodygroupByName("stattrak", selection.StatTrak.HasValue ? 1 : 0);
     }
 }
