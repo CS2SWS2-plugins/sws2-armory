@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SwiftlyS2.Shared.Events;
 using SwiftlyS2.Shared.GameEventDefinitions;
+using SwiftlyS2.Shared.GameHooks;
 using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.Natives;
 using SwiftlyS2.Shared.Players;
@@ -14,7 +15,9 @@ public partial class Sws2Armory
 {
     private readonly record struct Stamp(ulong SteamId, long Revision, byte Team);
     private readonly record struct AppliedWeapon(Stamp Stamp, ulong ItemId, int PaintKit, ushort Definition);
+    private readonly record struct WeaponSnapshot(ulong Session, uint Pawn, byte Team, uint Weapon, uint? PreviousWeapon, long ExpiresAt);
     private readonly Dictionary<uint, AppliedWeapon> _weaponsApplied = [];
+    private readonly Dictionary<int, WeaponSnapshot> _weaponSnapshots = [];
     private readonly Dictionary<uint, Stamp> _pawnsApplied = [];
     private readonly Dictionary<uint, (string Model, ushort Character, string Voice, bool Female)> _originalAgents = [];
     private readonly Dictionary<ulong, (int Kit, int Mvps, bool NoMusic, ushort Inventory)> _originalMusic = [];
@@ -241,7 +244,7 @@ public partial class Sws2Armory
                     if (selection is not null || !replacement || target == "knife")
                         ApplyWeapon(weapon, stamp, target, selection, cosmetic);
                 }
-                if (refreshView) RefreshWeaponView(current, weapons, weapon, raw, expectedActive);
+                if (refreshView) RefreshWeaponView(current, currentPawn, weapons, weapon, raw, expectedActive);
             }
             catch (Exception exception)
             {
@@ -251,7 +254,7 @@ public partial class Sws2Armory
         });
     }
 
-    private static void RefreshWeaponView(IPlayer player, CPlayer_WeaponServices weapons, CBasePlayerWeapon weapon,
+    private void RefreshWeaponView(IPlayer player, CCSPlayerPawn pawn, CPlayer_WeaponServices weapons, CBasePlayerWeapon weapon,
         uint raw, uint? expectedActive)
     {
         var active = weapons.ActiveWeapon;
@@ -261,10 +264,75 @@ public partial class Sws2Armory
             weapons.SelectWeapon(weapon);
         }
 
-        // The owner's first-person model can retain the old material across delta updates.
-        // Send a fresh snapshot after the give, subclass change and paint have settled.
+        var slot = player.PlayerID;
+        _weaponSnapshots.Remove(slot);
         var client = player.ServerSideClient;
-        if (client.Address != 0 && client.IsActive) client.ForceFullUpdate();
+        if (client.Address == 0 || !client.IsActive) return;
+
+        // A full snapshot can replay a view angle from a previous spawn or teleport.
+        // Wait for the client's acknowledgement before discarding the old correction.
+        if (pawn.ServerViewAngleChanges.Count != 0)
+        {
+            _weaponSnapshots[slot] = new(player.SessionId, pawn.Entity!.EntityHandle.Raw, pawn.TeamNum, raw,
+                expectedActive, Environment.TickCount64 + 1000);
+            return;
+        }
+        client.ForceFullUpdate();
+    }
+
+    private void OnProcessUsercmds(ref ProcessUsercmdsPostContext context)
+    {
+        var player = context.Params.Player;
+        var slot = player.PlayerID;
+        if (!_loaded || !_weaponSnapshots.TryGetValue(slot, out var snapshot)) return;
+        try
+        {
+            if (!player.IsValid || player.SessionId != snapshot.Session || Environment.TickCount64 >= snapshot.ExpiresAt
+                || player.PlayerPawn is not { IsValid: true, LifeState: 0 } pawn
+                || pawn.Entity?.EntityHandle.Raw != snapshot.Pawn || pawn.TeamNum != snapshot.Team
+                || pawn.WeaponServices is not { } weapons || !weapons.MyWeapons.Any(handle => handle.Raw == snapshot.Weapon))
+            {
+                _weaponSnapshots.Remove(slot);
+                return;
+            }
+
+            var active = weapons.ActiveWeapon;
+            if (active.Raw != snapshot.Weapon || !active.IsValid)
+            {
+                // Native deployment may still be pending after SelectWeapon.
+                if (!snapshot.PreviousWeapon.HasValue || active.IsValid && active.Raw != snapshot.PreviousWeapon.Value)
+                    _weaponSnapshots.Remove(slot);
+                return;
+            }
+
+            var client = player.ServerSideClient;
+            if (client.Address == 0 || !client.IsActive)
+            {
+                _weaponSnapshots.Remove(slot);
+                return;
+            }
+
+            ref var changes = ref pawn.ServerViewAngleChanges;
+            if (changes.Count > 0)
+            {
+                uint acknowledged = 0;
+                foreach (var command in context.Params.Usercmds)
+                    acknowledged = Math.Max(acknowledged, command.CSGOUserCmd.Base.ConsumedServerAngleChanges);
+                if (acknowledged == 0) return;
+                foreach (var change in changes)
+                    if (change.Index > acknowledged) return;
+
+                changes.RemoveAll();
+                pawn.ServerViewAngleChangesUpdated();
+            }
+            _weaponSnapshots.Remove(slot);
+            client.ForceFullUpdate();
+        }
+        catch (Exception exception)
+        {
+            _weaponSnapshots.Remove(slot);
+            Core.Logger.LogWarning(exception, "[sws2-armory] Could not refresh the weapon view for player slot {Slot}", slot);
+        }
     }
 
     private static void RestoreAmmo(CBasePlayerWeapon weapon, int clip1, int clip2, int[] reserve, bool capReserve = false)
@@ -384,6 +452,7 @@ public partial class Sws2Armory
     {
         if (@event.UserIdPlayer is { } player)
         {
+            _weaponSnapshots.Remove(player.PlayerID);
             Invalidate(player.SteamID);
             _runtimeFailures.Remove(player.SteamID);
             if (player.PlayerPawn is { } pawn) _originalAgents.Remove(pawn.Entity!.EntityHandle.Raw);
@@ -470,6 +539,7 @@ public partial class Sws2Armory
 
     private void OnDisconnected(IOnClientDisconnectedEvent @event)
     {
+        _weaponSnapshots.Remove(@event.PlayerId);
         if (!_slotSteamIds.Remove(@event.PlayerId, out var steamId)) return;
         _store.Forget(steamId);
         _cooldowns.Remove(steamId);
@@ -484,6 +554,7 @@ public partial class Sws2Armory
     private void ClearRuntime()
     {
         _weaponsApplied.Clear();
+        _weaponSnapshots.Clear();
         _pawnsApplied.Clear();
         _originalAgents.Clear();
         _originalMusic.Clear();

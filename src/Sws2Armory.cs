@@ -82,6 +82,7 @@ public partial class Sws2Armory(ISwiftlyCore core) : BasePlugin(core)
         _hooks.Add(Core.GameEvent.HookPost<EventItemPickup>(OnPickup));
         _hooks.Add(Core.GameEvent.HookPost<EventPlayerDeath>(OnDeath));
         _hooks.Add(Core.GameEvent.HookPre<EventRoundMvp>(OnMvp));
+        Core.GameHooks.Controller.ProcessUsercmds.Post += OnProcessUsercmds;
         Core.Event.OnPrecacheResource += OnPrecache;
         Core.Event.OnMapUnload += OnMapUnload;
         Core.Event.OnClientDisconnected += OnDisconnected;
@@ -108,6 +109,7 @@ public partial class Sws2Armory(ISwiftlyCore core) : BasePlugin(core)
         _subscription?.Dispose();
         foreach (var id in _commands) Core.Command.UnregisterCommand(id);
         foreach (var id in _hooks) Core.GameEvent.Unhook(id);
+        Core.GameHooks.Controller.ProcessUsercmds.Post -= OnProcessUsercmds;
         Core.Event.OnPrecacheResource -= OnPrecache;
         Core.Event.OnMapUnload -= OnMapUnload;
         Core.Event.OnClientDisconnected -= OnDisconnected;

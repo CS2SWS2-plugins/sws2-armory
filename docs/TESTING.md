@@ -20,4 +20,6 @@
 
 新版 HUD 专项：检查印花、挂件、探员、音乐盒、Float、Seed、StatTrak 与重置都能从五个侧栏入口到达。翻到皮肤列表第二页，连续选择两款皮肤，检查「已装备」标记原位更新、列表没有闪烁且仍在第二页。分别用枪械和刀具验证。导航栈应保持原深度，返回应保留父页。打开 admin 后直接输入 `!armoryreset`，军械库应打开独立菜单。
 
+换肤视角专项：在出生后或 KZ 检查点传送后转身，再为手持枪械和刀具换肤。分别在静止瞄准和持续移动鼠标时检查准星方向及外观更新。选完立即切枪或传送，确认延迟刷新不会干扰主动切枪或传送的目标视角。
+
 共享合约兼容专项：保留服务器上 admin、mapmanager、rockthevote 的原有版本，完整更新 menus 与 armory 后重启整个 CS2 进程。确认不再出现 `IMenuService.get_IsCustomHudAvailable()` 的 MissingMethodException；挂载 addon 后菜单正常、HUD 状态可查询。重载 menus 后再次验证 armory 重新取得回调；将 menus 设置为 classic 后 armory 拒绝开菜单。离线 CI 已用旧版合约预加载覆盖二进制兼容性，真实服务器的加载顺序仍需执行本项验收。
