@@ -31,7 +31,7 @@
 ```text
 sw plugins load sws2-cs2menus
 sw plugins load sws2-armory
-sw_armorystatus
+armorystatus
 ```
 
 运行目录：
@@ -51,13 +51,13 @@ csgo/addons/swiftlys2/
 
 `csgo/` 可能位于 `game/csgo/`。军械库只使用 menus 的新版 `custom_hud_layout` / Panorama HUD，不回退到中心 HTML。无需 armory 专属 Workshop addon，直接复用 admin 使用的 menus HUD 框架。确保 menus 的 `Menu.Backend` 为 `auto` 或 `hudlayout`、配置真实的 `Menu.HudLayoutWorkshopId`，并由 MultiAddonManager 下载挂载已编译的 addon；也可使用已挂载的本地布局资源。菜单插件 DLL 不包含编译后的 HUD addon，详细部署按 menus 的 Workshop 文档操作。
 
-执行 `sw_hudstatus` 确认 `layoutReady=True`，再用 `sw_armorystatus` 确认 `customHud=True`。缺少 HUD 资源、强制 `classic` 或使用旧版 menus 时，打开菜单会提示尚未就绪；直接设置饰品命令仍可使用。旧菜单不会作为替代入口。
+执行 `sw_hudstatus` 确认 `layoutReady=True`，再用 `armorystatus` 确认 `customHud=True`。缺少 HUD 资源、强制 `classic` 或使用旧版 menus 时，打开菜单会提示尚未就绪；直接设置饰品命令仍可使用。旧菜单不会作为替代入口。
 
 主面板采用与 admin 相同的**左侧分类 / 右侧内容**框架，五个侧栏入口分别为武器、刀具、手套、探员与音乐盒、饰品设置。第一项自动打开；印花、挂件、自定义参数、重新应用和重置都在“饰品设置”中，选择饰品后当前页显示“已装备”。重置使用新版 HUD 的确认布局。
 
 ## 玩家命令
 
-聊天默认使用 `!` 或 `/`，控制台使用 SwiftlyS2 的 `sw_` 命令前缀。
+聊天默认使用 `!` 或 `/`。在控制台输入命令名，例如 `armorystatus`。
 
 | 命令 | 用途 |
 | --- | --- |
@@ -78,11 +78,11 @@ csgo/addons/swiftlys2/
 | `!charms 关键词` / `!charms clear` | 选择或移除手持枪械挂件；支持完整目录 ID |
 | `!armoryrefresh` | 重试并重新应用个人饰品 |
 | `!armoryreset` | 打开重置确认；无菜单时使用 `!armoryreset confirm` |
-| `!armorystatus` | 查看版本、总饰品数、菜单及探员预缓存状态 |
+| `!armorystatus` | 查看插件状态，并在服务端日志记录手持武器及其饰品属性 |
 
 皮肤按枪械类型保存，刀具与手套各保存一组；探员按 T / CT 分开保存。Float 和 Seed 的默认值来自目录，已手动设置的值在换皮肤后继续保留。印花及挂件也可直接应用到未选择涂装的普通枪械。
 
-选择生效时会重新切换手持武器以刷新客户端；不赠送枪械、不补充弹药。若仍显示旧刀具、贴图或手套，请重新装备或重生。重置会清空插件偏好并移除插件饰品，**重生后完整恢复 Steam 库存原始外观**。插件卸载后同样以重生/换图恢复为准。
+更换枪械或刀具饰品时，插件刷新对应武器实体并转移原有弹药。若仍显示旧外观，持该武器输入 `!armorystatus`，服务端日志会记录选中的皮肤、实体上的涂装编号和动态属性数量。重置会清空插件偏好并移除插件饰品，**重生后完整恢复 Steam 库存原始外观**。插件卸载后同样以重生/换图恢复为准。
 
 ## 配置与保存
 

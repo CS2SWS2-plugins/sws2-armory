@@ -99,6 +99,36 @@ public partial class Sws2Armory
         else _weaponsApplied[raw] = new(stamp, weapon.AttributeManager.Item.ItemID, weapon.FallbackPaintKit);
     }
 
+    private void LogHeldWeaponStatus(IPlayer player)
+    {
+        try
+        {
+            if (player.PlayerPawn?.WeaponServices?.ActiveWeapon.Value is not { IsValid: true } weapon)
+            {
+                Core.Logger.LogInformation("[sws2-armory] Weapon status for {SteamId}: no active weapon", player.SteamID);
+                return;
+            }
+
+            var item = weapon.AttributeManager.Item;
+            var definition = item.ItemDefinitionIndex;
+            var knife = CosmeticCatalog.IsKnife(definition);
+            var target = knife ? "knife" : _catalog.WeaponTarget(definition);
+            var selection = target is null ? null : Profile(player)?.Items.GetValueOrDefault(target);
+            var skin = _catalog.Find(selection?.CosmeticId);
+            var charm = _catalog.Find(selection?.Charm);
+            Core.Logger.LogInformation(
+                "[sws2-armory] Weapon status for {SteamId}: entity={Entity} target={Target} definition={Definition} selected={Selection} expectedDefinition={ExpectedDefinition} paint={Paint} expectedPaint={ExpectedPaint} charm={Charm} itemId={ItemId} dynamicAttributes={Attributes} enabled={Enabled} applyFailed={ApplyFailed}",
+                player.SteamID, weapon.DesignerName, target, definition, skin?.Id, skin?.DefinitionIndex,
+                weapon.FallbackPaintKit, skin?.Kit, charm?.Id, item.ItemID,
+                item.NetworkedDynamicAttributes.Attributes.Count, _settings.Allows(knife ? CosmeticKind.Knife : CosmeticKind.Weapon),
+                _runtimeFailures.Contains(player.SteamID));
+        }
+        catch (Exception exception)
+        {
+            Core.Logger.LogWarning(exception, "[sws2-armory] Could not read weapon status for {SteamId}", player.SteamID);
+        }
+    }
+
     private bool TryReplaceWeapon(IPlayer player, CCSPlayerPawn pawn, CPlayer_WeaponServices weapons, CBasePlayerWeapon oldWeapon,
         string target, ItemSelection? selection, CatalogEntry? cosmetic, Stamp stamp)
     {

@@ -131,6 +131,13 @@ public partial class Sws2Armory
         Refresh(player);
     }
 
+    private void OnStatus(ICommandContext context)
+    {
+        context.Reply($"sws2-armory {VersionInfo.Version}; enabled={_settings.Enabled}; catalog={_catalog.Entries.Count}; menus={_menus?.IsAvailable == true}; customHud={CustomHudReady}; precachedAgents={_precached.Count}");
+        if (context.Sender is { IsValid: true, IsFakeClient: false, SteamID: > 0 } player)
+            LogHeldWeaponStatus(player);
+    }
+
     private void OnReset(ICommandContext context)
     {
         if (!TryPlayer(context, out var player)) return;
