@@ -154,7 +154,7 @@ public partial class Sws2Armory
         if (!CanMutate(player)) return;
         if (_menus?.GetNavigationStack(player).Any(menu => menu.Id.StartsWith("armory.", StringComparison.Ordinal)) == true) _menus.Close(player);
         _store.Reset(player.SteamID);
-        Changed(player, refreshWeapons: true);
+        Changed(player, refreshWeapons: true, refreshPawn: true);
         Reply(player, "reset");
     }
 
@@ -168,9 +168,9 @@ public partial class Sws2Armory
         return true;
     }
 
-    private void Select(IPlayer player, CatalogEntry entry, string? attachmentTarget = null, int slot = 0)
+    private bool Select(IPlayer player, CatalogEntry entry, string? attachmentTarget = null, int slot = 0)
     {
-        if (!_settings.Allows(entry.Kind) || !CanMutate(player)) return;
+        if (!_settings.Allows(entry.Kind) || !CanMutate(player)) return false;
         var profile = Profile(player)!;
         switch (entry.Kind)
         {
@@ -186,7 +186,7 @@ public partial class Sws2Armory
             case CosmeticKind.Sticker:
             case CosmeticKind.Charm:
                 if (attachmentTarget is null || !_catalog.Search(CosmeticKind.Weapon, target: attachmentTarget).Any()
-                    || !_settings.Allows(CosmeticKind.Weapon) || slot is < 0 or > 4) return;
+                    || !_settings.Allows(CosmeticKind.Weapon) || slot is < 0 or > 4) return false;
                 var attached = GetItem(profile, attachmentTarget);
                 if (entry.Kind == CosmeticKind.Sticker) attached.Stickers[slot] = entry.Id;
                 else attached.Charm = entry.Id;
@@ -200,8 +200,9 @@ public partial class Sws2Armory
             CosmeticKind.Weapon or CosmeticKind.Knife => entry.Target,
             CosmeticKind.Sticker or CosmeticKind.Charm => attachmentTarget,
             _ => null
-        });
+        }, refreshPawn: entry.Kind is CosmeticKind.Agent or CosmeticKind.Glove);
         Reply(player, "selected", entry.DisplayName(IsChinese(player)));
+        return true;
     }
 
     private static ItemSelection GetItem(PlayerLoadout profile, string target)

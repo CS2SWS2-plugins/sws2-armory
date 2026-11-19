@@ -29,6 +29,7 @@ public partial class Sws2Armory(ISwiftlyCore core) : BasePlugin(core)
     private readonly List<Guid> _commands = [];
     private readonly List<Guid> _hooks = [];
     private readonly Dictionary<ulong, long> _revisions = [];
+    private readonly Dictionary<ulong, long> _pawnRevisions = [];
     private readonly Dictionary<ulong, long> _cooldowns = [];
     private readonly HashSet<ulong> _failedProfiles = [];
     private readonly Dictionary<int, ulong> _slotSteamIds = [];
@@ -152,10 +153,10 @@ public partial class Sws2Armory(ISwiftlyCore core) : BasePlugin(core)
         return true;
     }
 
-    private void Changed(IPlayer player, string? target = null, bool refreshWeapons = false)
+    private void Changed(IPlayer player, string? target = null, bool refreshWeapons = false, bool refreshPawn = false)
     {
         _store.Save(player.SteamID);
-        Invalidate(player.SteamID);
+        Invalidate(player.SteamID, refreshPawn || target == "glove");
         ReconcilePlayer(player, refreshWeapons || target is not (null or "glove"), target);
     }
 
@@ -167,7 +168,11 @@ public partial class Sws2Armory(ISwiftlyCore core) : BasePlugin(core)
         Reply(player, "refreshed");
     }
 
-    private void Invalidate(ulong steamId) => _revisions[steamId] = _revisions.GetValueOrDefault(steamId) + 1;
+    private void Invalidate(ulong steamId, bool refreshPawn = true)
+    {
+        _revisions[steamId] = _revisions.GetValueOrDefault(steamId) + 1;
+        if (refreshPawn) _pawnRevisions[steamId] = _pawnRevisions.GetValueOrDefault(steamId) + 1;
+    }
     private void Reply(IPlayer player, string key, params object[] args)
     {
         var localizer = Core.Translation.GetPlayerLocalizer(player);

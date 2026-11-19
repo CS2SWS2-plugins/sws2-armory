@@ -12,12 +12,12 @@ public partial class Sws2Armory
     private string Text(IPlayer player, string key) => Core.Translation.GetPlayerLocalizer(player)[key];
     private bool IsChinese(IPlayer player) => Text(player, "language") == "zh";
 
-    private IMenuBuilder? Menu(IPlayer player, string key, MenuLayout layout = MenuLayout.List)
+    private IMenuBuilder? Menu(IPlayer player, string key, MenuLayout layout = MenuLayout.List, string? id = null)
     {
         if (!_loaded || !_settings.Enabled || !player.IsValid || Profile(player) is null) return null;
         if (_menus is not { IsAvailable: true }) { Reply(player, "error.menus"); return null; }
         if (!CustomHudReady) { Reply(player, "error.hud"); return null; }
-        return _menus.CreateMenu(Text(player, key)).Id($"armory.{player.SteamID}.{Guid.NewGuid():N}")
+        return _menus.CreateMenu(Text(player, key)).Id(id ?? $"armory.{player.SteamID}.{Guid.NewGuid():N}")
             .Layout(layout).Comment(Text(player, "menu.help")).PageSize(5).ShowBack().ShowClose().CloseOnSelect(false);
     }
 
@@ -107,11 +107,11 @@ public partial class Sws2Armory
     }
 
     private void OpenEntries(IPlayer player, CatalogEntry[] entries, string titleKey,
-        string? attachmentTarget = null, int slot = 0, bool root = false, bool grouped = false, bool replaceCurrent = false)
+        string? attachmentTarget = null, int slot = 0, bool root = false, bool grouped = false, string? currentMenuId = null)
     {
         entries = entries.Where(e => _settings.Allows(e.Kind)).ToArray();
         if (entries.Length == 0) { Reply(player, "error.not_found"); return; }
-        var menu = Menu(player, titleKey);
+        var menu = Menu(player, titleKey, id: currentMenuId);
         if (menu is null) return;
         if (!grouped && entries.Select(e => e.Group).Distinct().Skip(1).Any())
         {
@@ -146,11 +146,11 @@ public partial class Sws2Armory
                     .Comment((IsSelected(player, entry, attachmentTarget, slot) ? Text(player, "menu.selected") + " · " : "") + EntryDetails(player, entry))
                     .OnSelected(c =>
                     {
-                        Select(c.Player, entry, attachmentTarget, slot);
-                        OpenEntries(c.Player, entries, titleKey, attachmentTarget, slot, grouped: grouped, replaceCurrent: true);
+                        if (Select(c.Player, entry, attachmentTarget, slot))
+                            OpenEntries(c.Player, entries, titleKey, attachmentTarget, slot, grouped: grouped, currentMenuId: c.Menu.Id);
                         return ValueTask.CompletedTask;
                     }));
-        Show(player, menu, root, replaceCurrent);
+        Show(player, menu, root, replaceCurrent: currentMenuId is not null);
     }
 
     private string EntryDetails(IPlayer player, CatalogEntry entry)

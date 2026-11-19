@@ -61,8 +61,14 @@ public partial class Sws2Armory
                         if (target is null) continue;
                         var refresh = refreshWeapons && (refreshTarget is null || refreshTarget == target);
                         var previouslyApplied = _weaponsApplied.TryGetValue(raw, out var applied);
-                        if (!refresh && previouslyApplied && applied.Stamp == stamp && applied.ItemId == item.ItemID
-                            && applied.PaintKit == weapon.FallbackPaintKit && applied.Definition == definition) continue;
+                        if (!refresh && previouslyApplied && applied.ItemId == item.ItemID
+                            && applied.PaintKit == weapon.FallbackPaintKit && applied.Definition == definition
+                            && (applied.Stamp == stamp || refreshTarget is not null && refreshTarget != target
+                                && applied.Stamp.SteamId == stamp.SteamId && applied.Stamp.Team == stamp.Team))
+                        {
+                            _weaponsApplied[raw] = applied with { Stamp = stamp };
+                            continue;
+                        }
                         profile.Items.TryGetValue(target, out var selection);
                         var kind = knife ? CosmeticKind.Knife : CosmeticKind.Weapon;
                         var cosmetic = _catalog.Find(selection?.CosmeticId);
@@ -73,12 +79,13 @@ public partial class Sws2Armory
                         if (selection is null && !previouslyApplied) continue;
                         if (refresh && TryReplaceWeapon(player, pawn, weapons, weapon, target, selection, cosmetic, stamp)) continue;
                         ApplyWeapon(weapon, stamp, target, selection, cosmetic);
-                        if (knife) ScheduleKnifePaint(player, pawn, raw, stamp, refresh);
+                        if (knife || refresh) ScheduleWeaponPaint(player, pawn, raw, stamp, target, refresh);
                     }
-            if (!_pawnsApplied.TryGetValue(pawn.Entity!.EntityHandle.Raw, out var pawnStamp) || pawnStamp != stamp)
+            var pawnStamp = stamp with { Revision = _pawnRevisions.GetValueOrDefault(player.SteamID) };
+            if (!_pawnsApplied.TryGetValue(pawn.Entity!.EntityHandle.Raw, out var appliedPawn) || appliedPawn != pawnStamp)
             {
                 ApplyPawn(player, pawn, profile);
-                _pawnsApplied[pawn.Entity!.EntityHandle.Raw] = stamp;
+                _pawnsApplied[pawn.Entity!.EntityHandle.Raw] = pawnStamp;
             }
             ApplyMusic(player, profile);
         }
@@ -172,7 +179,7 @@ public partial class Sws2Armory
         {
             _weaponsApplied.Remove(raw);
             weapons.RemoveWeapon(replacement);
-            if (active.Value is { IsValid: true } previous) weapons.SelectWeapon(previous);
+            if (active.Value is { IsValid: true } originalActive) weapons.SelectWeapon(originalActive);
             throw;
         }
         if (oldWeapon.IsValid)
@@ -181,23 +188,19 @@ public partial class Sws2Armory
             else if (!oldWeapon.OwnerEntity.IsValid) oldWeapon.Despawn();
         }
         _weaponsApplied.Remove(oldRaw);
-        if (active.Raw == oldRaw && target == "knife")
-        {
-            // The engine may auto-select another weapon when it removes the old knife.
-            var expectedActive = weapons.ActiveWeapon.Raw;
-            ScheduleKnifePaint(player, pawn, raw, stamp, refreshView: true, expectedActive: expectedActive);
-            return true;
-        }
-        if (active.Raw == oldRaw) weapons.SelectWeapon(replacement);
-        else if (active.Value is { IsValid: true } previous && weapons.ActiveWeapon.Raw != active.Raw)
+        // Wait for the new entity's paint before restoring it to the player's hands.
+        // The engine may select another weapon while removing the old one.
+        uint? expectedActive = active.Raw == oldRaw ? weapons.ActiveWeapon.Raw : null;
+        if (!expectedActive.HasValue && active.Value is { IsValid: true } previous && weapons.ActiveWeapon.Raw != active.Raw)
             weapons.SelectWeapon(previous);
 
-        if (target == "knife")
-        {
-            ScheduleKnifePaint(player, pawn, raw, stamp, refreshView: true);
-            return true;
-        }
+        if (target != "knife") ScheduleAmmoRestore(player, pawn, raw, stamp.Team, clip1, clip2, reserve);
+        ScheduleWeaponPaint(player, pawn, raw, stamp, target, refreshView: true, expectedActive: expectedActive, replacement: true);
+        return true;
+    }
 
+    private void ScheduleAmmoRestore(IPlayer player, CCSPlayerPawn pawn, uint raw, byte team, int clip1, int clip2, int[] reserve)
+    {
         var slot = player.PlayerID;
         var session = player.SessionId;
         var pawnRaw = pawn.Entity!.EntityHandle.Raw;
@@ -205,17 +208,16 @@ public partial class Sws2Armory
         {
             if (!_loaded || Core.PlayerManager.GetPlayer(slot) is not { IsValid: true } current || current.SessionId != session
                 || current.PlayerPawn is not { IsValid: true, LifeState: 0 } currentPawn || currentPawn.Entity!.EntityHandle.Raw != pawnRaw
-                || currentPawn.TeamNum != stamp.Team || currentPawn.WeaponServices is not { } currentWeapons
+                || currentPawn.TeamNum != team || currentPawn.WeaponServices is not { } currentWeapons
                 || !currentWeapons.MyWeapons.Any(handle => handle.Raw == raw)
                 || new CHandle<CBasePlayerWeapon>(raw).Value is not { IsValid: true } liveWeapon) return;
             // Cap any delayed refill without refunding a shot fired since the switch.
             RestoreAmmo(liveWeapon, Math.Min(clip1, liveWeapon.Clip1), Math.Min(clip2, liveWeapon.Clip2), reserve, capReserve: true);
         });
-        return true;
     }
 
-    private void ScheduleKnifePaint(IPlayer player, CCSPlayerPawn pawn, uint raw, Stamp stamp,
-        bool refreshView, uint? expectedActive = null)
+    private void ScheduleWeaponPaint(IPlayer player, CCSPlayerPawn pawn, uint raw, Stamp stamp, string target,
+        bool refreshView, uint? expectedActive = null, bool replacement = false)
     {
         var slot = player.PlayerID;
         var session = player.SessionId;
@@ -226,33 +228,38 @@ public partial class Sws2Armory
                 || current.PlayerPawn is not { IsValid: true, LifeState: 0 } currentPawn || currentPawn.Entity!.EntityHandle.Raw != pawnRaw
                 || currentPawn.TeamNum != stamp.Team || currentPawn.WeaponServices is not { } weapons
                 || !weapons.MyWeapons.Any(handle => handle.Raw == raw)
-                || new CHandle<CBasePlayerWeapon>(raw).Value is not { IsValid: true } knife) return;
+                || new CHandle<CBasePlayerWeapon>(raw).Value is not { IsValid: true } weapon) return;
             try
             {
                 if (_revisions.GetValueOrDefault(current.SteamID) == stamp.Revision)
                 {
-                    // Knife deployment can rebuild the model and overwrite paint written during GiveNamedItem.
-                    var selection = _settings.Allows(CosmeticKind.Knife) ? Profile(current)?.Items.GetValueOrDefault("knife") : null;
+                    // GiveNamedItem can reset econ attributes as the entity finishes initializing.
+                    var kind = target == "knife" ? CosmeticKind.Knife : CosmeticKind.Weapon;
+                    var selection = _settings.Allows(kind) ? Profile(current)?.Items.GetValueOrDefault(target) : null;
                     var cosmetic = _catalog.Find(selection?.CosmeticId);
-                    if (cosmetic is not { Kind: CosmeticKind.Knife, Target: "knife" }) cosmetic = null;
-                    ApplyWeapon(knife, stamp, "knife", selection, cosmetic);
+                    if (cosmetic is not null && (cosmetic.Kind != kind || cosmetic.Target != target)) cosmetic = null;
+                    if (selection is not null || !replacement || target == "knife")
+                        ApplyWeapon(weapon, stamp, target, selection, cosmetic);
                 }
-                if (refreshView) RefreshKnifeView(current, weapons, knife, expectedActive);
+                if (refreshView) RefreshWeaponView(current, weapons, weapon, raw, expectedActive);
             }
             catch (Exception exception)
             {
                 if (_runtimeFailures.Add(stamp.SteamId))
-                    Core.Logger.LogError(exception, "[sws2-armory] Failed to finish applying the knife for {SteamId}", stamp.SteamId);
+                    Core.Logger.LogError(exception, "[sws2-armory] Failed to finish applying {Target} for {SteamId}", target, stamp.SteamId);
             }
         });
     }
 
-    private static void RefreshKnifeView(IPlayer player, CPlayer_WeaponServices weapons, CBasePlayerWeapon knife, uint? expectedActive)
+    private static void RefreshWeaponView(IPlayer player, CPlayer_WeaponServices weapons, CBasePlayerWeapon weapon,
+        uint raw, uint? expectedActive)
     {
         var active = weapons.ActiveWeapon;
-        if (expectedActive.HasValue && (!active.IsValid || active.Raw == expectedActive.Value)
-            && active.Raw != knife.Entity!.EntityHandle.Raw)
-            weapons.SelectWeapon(knife);
+        if (active.Raw != raw)
+        {
+            if (!expectedActive.HasValue || active.IsValid && active.Raw != expectedActive.Value) return;
+            weapons.SelectWeapon(weapon);
+        }
 
         // The owner's first-person model can retain the old material across delta updates.
         // Send a fresh snapshot after the give, subclass change and paint have settled.
@@ -326,11 +333,11 @@ public partial class Sws2Armory
         var slot = player.PlayerID;
         var session = player.SessionId;
         var raw = pawn.Entity!.EntityHandle.Raw;
-        var revision = _revisions.GetValueOrDefault(player.SteamID);
+        var revision = _pawnRevisions.GetValueOrDefault(player.SteamID);
         Core.Scheduler.NextTick(() =>
         {
             if (_loaded && Core.PlayerManager.GetPlayer(slot) is { IsValid: true } current && current.SessionId == session
-                && _revisions.GetValueOrDefault(current.SteamID) == revision
+                && _pawnRevisions.GetValueOrDefault(current.SteamID) == revision
                 && current.PlayerPawn is { IsValid: true } livePawn && livePawn.Entity!.EntityHandle.Raw == raw)
                 livePawn.SetBodygroupByName("first_or_third_person", hideDefaultGloves ? 1 : 0);
         });
@@ -439,7 +446,7 @@ public partial class Sws2Armory
             }
             catch (Exception exception)
             {
-                Invalidate(player.SteamID);
+                Invalidate(player.SteamID, refreshPawn: false);
                 Core.Logger.LogWarning(exception, "[sws2-armory] Could not update live StatTrak counter");
             }
         }
@@ -467,6 +474,7 @@ public partial class Sws2Armory
         _store.Forget(steamId);
         _cooldowns.Remove(steamId);
         _revisions.Remove(steamId);
+        _pawnRevisions.Remove(steamId);
         _originalMusic.Remove(steamId);
         _runtimeFailures.Remove(steamId);
         _failedProfiles.Remove(steamId);
